@@ -1,0 +1,47 @@
+---
+title: "615 Midterm"
+author: "Amie Thomas"
+date: "2023-10-30"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readr)
+library(dplyr)
+library(stringr)
+```
+
+#load in the NOAA data
+```{r}
+Mydata <- read_csv("StormEvents_details-ftp_v1.0_d2020_c20230927.csv.gz")
+```
+
+#get rid of columns not of interest
+```{r}
+floods <- Mydata |>
+  filter(EVENT_TYPE == "Flood") |>
+   select(-MAGNITUDE, -MAGNITUDE_TYPE, -CATEGORY, -TOR_F_SCALE, -TOR_LENGTH, -TOR_WIDTH, 
+          -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME, -BEGIN_RANGE,
+          -BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE, -BEGIN_LAT,
+          -BEGIN_LON, -END_LAT, -END_LON, -WFO)
+```
+
+#change damage data into useable intergers
+```{r}
+floods$DAMAGE_PROPERTY <- str_replace_all(floods$DAMAGE_PROPERTY, "[^0-9.]", "")
+floods$DAMAGE_PROPERTY <- as.numeric(floods$DAMAGE_PROPERTY)
+#floods$DAMAGE_PROPERTY <- floods$DAMAGE_PROPERTY*1000
+
+
+floods$DAMAGE_CROPS <- str_replace_all(floods$DAMAGE_CROPS, "[^0-9.]", "")
+floods$DAMAGE_CROPS <- as.numeric(floods$DAMAGE_CROPS)
+
+```
+#load in the FEMA data
+```{r}
+Mydata_2 <- read.csv("FemaWebDisasterSummaries.csv", header = TRUE)
+
+```
+
