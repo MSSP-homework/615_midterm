@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 
 install.packages("sf")
+install.packages("leaflet")
 library(readr)
 library(dplyr)
 library(stringr)
@@ -71,6 +72,17 @@ what states have the most damage
 what states have what types of flood causes
 can I look at the spread of the event
 
+#test
+```{r}
+test <- leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(noaa_20_21 = BEGIN_LAT, lng = ~Longitude, lat = ~Latitude, color = "blue", radius = 5) %>%
+  addCircleMarkers(data = end_data, lng = ~Longitude, lat = ~Latitude, color = "red", radius = 5) %>%
+  addPolylines(data = begin_data, lng = ~c(Longitude, end_data$Longitude), lat = ~c(Latitude, end_data$Latitude), color = "blue")
+m
+
+
+```
 ###<FEMA>###
 
 #load in the FEMA data and merge
