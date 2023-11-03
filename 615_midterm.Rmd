@@ -64,25 +64,15 @@ noaa_20_21 <- noaa_20_21 %>%
   filter(DAMAGE_PROPERTY != 0 | DAMAGE_CROPS != 0)
 ```
 
-#Questions
-what types of flood causes result in the most damage
-what months have the most floods
-what types of flood causes happen in which months
-what states have the most damage
-what states have what types of flood causes
-can I look at the spread of the event
-
-#test
-```{r}
-test <- leaflet() %>%
-  addTiles() %>%
-  addCircleMarkers(noaa_20_21 = BEGIN_LAT, lng = ~Longitude, lat = ~Latitude, color = "blue", radius = 5) %>%
-  addCircleMarkers(data = end_data, lng = ~Longitude, lat = ~Latitude, color = "red", radius = 5) %>%
-  addPolylines(data = begin_data, lng = ~c(Longitude, end_data$Longitude), lat = ~c(Latitude, end_data$Latitude), color = "blue")
-m
+#NOAA Questions
+-what types of flood causes result in the most damage
+-what months have the most floods
+-what types of flood causes happen in which months
+-what states have the most damage
+-what states have what types of flood causes
+-can I look at the spread of the event
 
 
-```
 ###<FEMA>###
 
 #load in the FEMA data and merge
@@ -98,8 +88,21 @@ fema_data <- left_join(Mydata_3, Mydata_4, "disasterNumber")
 fema_data$incidentBeginDate <- year(fema_data$incidentBeginDate)
 fema_data_int <- fema_data |> 
   filter(incidentType == "Flood") |>
-  filter(incidentBeginDate == "2020" | incidentBeginDate ==  "2021")
+  filter(incidentBeginDate == "2020" | incidentBeginDate ==  "2021")|>
+  select(-hash.x, -lastRefresh.x, -id.x, -declarationType, -disasterCloseoutDate, 
+         -tribalRequest, -lastRefresh.y, -id.y, -hash.y, -iaLoadDate, -lastIAFilingDate, -ihProgramDeclared, -iaProgramDeclared, -paProgramDeclared, -hmProgramDeclared)|>
+  relocate(designatedArea, .before = declarationDate)
+
+#take care of NA's
+fema_data_int$totalNumberIaApporved[is.na(fema_data_int$totalNumberIaApproved)] <- 0
+fema_data_int$totalAmountIhpApproved[is.na(fema_data_int$totalAmountIhpApproved)] <- 0
+fema_data_int$totalAmountHaApproved[is.na(fema_data_int$totalAmountHaApproved)] <- 0
+fema_data_int$totalAmountOnaAproved[is.na(fema_data_int$totalAmountOnaAproved)] <- 0
+
+#need to figure out what these mean and what is the actually amount sent as relief to help people in these areas
 ```
 
-
-
+#FEMA Questions
+-what counties receive the most relief
+-further what are the demographics in this area 
+-how long did it take for this area to receive support
