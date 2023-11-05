@@ -36,11 +36,12 @@ noaa_20_21 <- rbind(Mydata, Mydata_2)
 
 #get rid of columns not of interest
 ```{r}
-noaa_20_21 <- Mydata |>
+noaa_20_21 <- noaa_20_21 |>
   filter(EVENT_TYPE == "Flood") |>
    select(-MAGNITUDE, -MAGNITUDE_TYPE, -CATEGORY, -TOR_F_SCALE, -TOR_LENGTH, -TOR_WIDTH, 
-          -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME, -BEGIN_RANGE,
-          -BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE, -WFO)
+          -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME,
+          -BEGIN_RANGE,-BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE,
+          -WFO)
 ```
 
 #change damage data into useable intergers
@@ -63,7 +64,7 @@ noaa_20_21$DAMAGE_CROPS <- noaa_20_21$DAMAGE_CROPS*100000
 #filter out events with no damage
 #organize by most property damage
 ```{r}
-noaa_20_21 <- arrange(noaa_20_21, desc(DAMAGE_PROPERTY))
+#noaa_20_21 <- arrange(noaa_20_21, desc(DAMAGE_PROPERTY))
 noaa_20_21 <- noaa_20_21 %>%
   filter(DAMAGE_PROPERTY != 0 | DAMAGE_CROPS != 0)
 
@@ -86,18 +87,48 @@ options(scipen = 999) #out of sci. notation
 
 #
 -what months have the most floods
+```{r}
+
+```
 -what types of flood causes happen in which months
+```{r}
+# p <- ggplot(flood_data, aes(x = Date, y = Count, color = Cause)) +
+#   geom_line() +
+#   labs(
+#     title = "Time Series of Floods by Cause",
+#     x = "Month",
+#     y = "Number of Floods"
+#   ) +
+#   scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+#   scale_color_brewer(palette = "Set1") +
+#   theme_minimal()
+
+# print(p)
+
+```
 -what states have the most damage
 -what states have what types of flood causes
 -can I look at the spread of the event
 -what states have the most crop damage
 -how many of each flood cause happened 
 -which state has the most floods
+-what kind of events happen the most frequently
+-make a map by state with the total amount of flood damage for both years
+-number of floods from 2020 to 2021
 
 #create a total damage column
 
 
+#test
+```{r}
+noaa_20_21_test <- noaa_20_21
 
+
+
+
+noaa_20_21_test$BEGIN_YEARMONTH <- as.Date(noaa_20_21_test$BEGIN_YEARMONTH, format = "%Y%m")
+
+```
 
 
 
