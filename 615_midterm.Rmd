@@ -11,13 +11,17 @@ knitr::opts_chunk$set(echo = TRUE)
 install.packages("sf")
 install.packages("leaflet")
 library(readr)
-library(dplyr)
-library(stringr)
+library(tidyverse)
 library(lubridate)
 library(ggplot2)
-library(sf)
-library(leaflet)
+library(viridis)
+#library(sf)
+#library(leaflet)
 ```
+
+-How dangerous are floods? 
+-How expensive? 
+-Is there any pattern to the kinds of communities that suffer losses from floods?
 
 ###<NOAA>###
 
@@ -57,20 +61,50 @@ noaa_20_21$DAMAGE_CROPS <- noaa_20_21$DAMAGE_CROPS*100000
 ```
 
 #filter out events with no damage
-#find areas with the most damage to property
+#organize by most property damage
 ```{r}
 noaa_20_21 <- arrange(noaa_20_21, desc(DAMAGE_PROPERTY))
 noaa_20_21 <- noaa_20_21 %>%
   filter(DAMAGE_PROPERTY != 0 | DAMAGE_CROPS != 0)
+
+noaa_20_21 <- noaa_20_21 |>
+  mutate(DAMAGE_TOTAL = DAMAGE_CROPS + DAMAGE_PROPERTY)|>
+  relocate(DAMAGE_TOTAL, .before = SOURCE)
+
+options(scipen = 999) #out of sci. notation
+
+
 ```
+
 
 #NOAA Questions
 -what types of flood causes result in the most damage
+```{r}
+
+
+```
+
+#
 -what months have the most floods
 -what types of flood causes happen in which months
 -what states have the most damage
 -what states have what types of flood causes
 -can I look at the spread of the event
+-what states have the most crop damage
+-how many of each flood cause happened 
+-which state has the most floods
+
+#create a total damage column
+
+
+
+
+
+
+
+
+
+
 
 
 ###<FEMA>###
@@ -106,3 +140,10 @@ fema_data_int$totalAmountOnaAproved[is.na(fema_data_int$totalAmountOnaAproved)] 
 -what counties receive the most relief
 -further what are the demographics in this area 
 -how long did it take for this area to receive support
+
+#Need to know 
+-totalnumberIaapproved
+-totalamountihpapproved
+-totalamounthaapproved
+-totalamountOnaapproved
+-so many different variables what the hell is the one that tells me the information i want to know
