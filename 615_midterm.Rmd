@@ -64,13 +64,12 @@ noaa_20_21$DAMAGE_CROPS <- noaa_20_21$DAMAGE_CROPS*100000
 ```
 
 #filter out events with no damage
-#organize by most property damage
 ```{r}
 noaa_20_21 <- noaa_20_21 %>%
   filter(DAMAGE_PROPERTY != 0 | DAMAGE_CROPS != 0)
 
 noaa_20_21 <- noaa_20_21 |>
-  mutate(DAMAGE_TOTAL = DAMAGE_CROPS + DAMAGE_PROPERTY)|>
+  mutate(DAMAGE_TOTAL = DAMAGE_CROPS + DAMAGE_PROPERTY)|> #create total damage column
   relocate(DAMAGE_TOTAL, .before = SOURCE)
 
 options(scipen = 999) #out of sci. notation
@@ -88,12 +87,16 @@ cause_dam <- noaa_20_21 |>
   summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))
 
 
-ggplot(cause_dam, aes(x = Month, y = DAMAGE_TOTAL)) +
-  geom_line(aes(color = FLOOD_CAUSE), size = 1) +
+ggplot(cause_dam, aes(x = Month, y = DAMAGE_TOTAL, color = FLOOD_CAUSE)) +
+  geom_line(size = 1) +
   scale_x_continuous(breaks = 1:12, labels = month.abb) +
-  labs(x = "Month", y = "Total Damage", color = "Flood Cause") +
-  theme_minimal() +
-  facet_wrap(~FLOOD_CAUSE, ncol = 2)
+  scale_y_continuous(labels = scales::comma, breaks = seq(0, 600000000, by = 100000000)) +
+  labs(title = "Damage by Flood Cause",
+       subtitle = "for years 2020-2021",
+       x = "Month", 
+       y = "Total Damage", 
+       color = "Flood Cause") +
+  theme_minimal()
 
 
 
@@ -125,7 +128,6 @@ ggplot(flood_month, aes(x = MONTH_NAME, y = count, fill = MONTH_NAME)) +
 ```
 #This graph shows that most floods for the years 2020-2021 occurred during the month of Februray
 
--what types of flood causes happen in which months
 
 -states with the most flood damage ##trying visualize as a map but it will not work ugggghhh
 ```{r}
@@ -141,8 +143,6 @@ states_map <- map_data("state")
 state_dam$STATE <- str_to_lower(state_dam$STATE)
 
 #merge original with spatial 
-#dam_map <- merge(states_map, state_dam, by.x = "region", by.y = "STATE")
- 
 dam_map <- left_join(states_map, state_dam, by = c("region" = "STATE"))|>
   select(-subregion)
 
@@ -158,50 +158,43 @@ coord_map("polyconic")
 
 ```
 
--what states have the most floods in this dataset potentially meaningless
-```{r}
-flood_type_month <- noaa_20_21 |>
-  group_by(STATE)|>
-  #group_by(FLOOD_CAUSE)
-  summarise(count = n())
-
-
-# ggplot(flood_data, aes(x = Date, y = Count, color = FLOOD_CAUSE)) +
-#   geom_line() +
-#   labs(
-#     title = "Time Series of Floods by Cause",
-#     x = "Month",
-#     y = "Number of Floods"
-#   ) +
-#   scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
-#   scale_color_brewer(palette = "Set1") +
-#   theme_minimal()
-
-
-
-```
 
 -what states have what types of flood causes
-
--what states have the most crop damage
--how many of each flood cause happened 
--which states have the most floods
--what kind of events happen the most frequently
--number of floods from 2020 to 2021
-
-#create a total damage column
-
-
-#test
 ```{r}
-noaa_20_21_test <- noaa_20_21
 
+state_trop <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Heavy Rain / Tropical System") |>
+  group_by(STATE)
+#Florida
 
+state_ice <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Ice Jam")|>
+  group_by(STATE)
 
+state_burn <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Heavy Rain / Burn Area")|>
+  group_by(STATE)
 
-noaa_20_21_test$BEGIN_YEARMONTH <- as.Date(noaa_20_21_test$BEGIN_YEARMONTH, format = "%Y%m")
+state_melt <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Heavy Rain / Snow Melt")|>
+  group_by(STATE)
 
+state_levee <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Dam / Levee Break")|>
+  group_by(STATE)
+
+state_release <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Planned Dam Release")|>
+  group_by(STATE)
+
+state_just_rain <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Heavy Rain")|>
+  group_by(STATE)
 ```
+
+
+
+
 
 
 
