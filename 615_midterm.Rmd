@@ -36,14 +36,14 @@ noaa_20_21 <- rbind(Mydata, Mydata_2)
 #how much damage was done
 ```
 
-#get rid of columns not of interest
+#get rid of columns and rows not of interest
 ```{r}
 noaa_20_21 <- noaa_20_21 |>
-  filter(EVENT_TYPE == "Flood") |>
-   select(-MAGNITUDE, -MAGNITUDE_TYPE, -CATEGORY, -TOR_F_SCALE, -TOR_LENGTH, -TOR_WIDTH, 
-          -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME,
-          -BEGIN_RANGE,-BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE,
-          -WFO)
+  filter(grepl("Flood", EVENT_TYPE, ignore.case = TRUE))|>
+  select(-MAGNITUDE, -MAGNITUDE_TYPE, -CATEGORY, -TOR_F_SCALE, -TOR_LENGTH, -TOR_WIDTH, 
+           -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME,
+           -BEGIN_RANGE,-BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE,
+           -WFO)
 ```
 
 #change damage data into useable intergers
@@ -74,6 +74,27 @@ noaa_20_21 <- noaa_20_21 |>
 
 options(scipen = 999) #out of sci. notation
 ```
+
+-What states have what type of floods
+```{r}
+state_flood_type <- noaa_20_21 |>
+  group_by(STATE, EVENT_TYPE)|>
+  summarise(count = n())
+
+#organize to get a better idea 
+easier_sft <- state_flood_type |>
+  pivot_wider(names_from = STATE, values_from = count)
+
+
+```
+
+-what types of floods are the most damaging 
+
+-what months have what types of floods
+
+-Causes of the types of floods
+
+-what states have the most total damage
 
 
 #NOAA Questions
@@ -194,7 +215,7 @@ state_just_rain <- noaa_20_21 |>
 
 
 
-
+- how long does a flood usually last
 
 
 
