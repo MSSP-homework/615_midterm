@@ -8,25 +8,16 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-install.packages("sf")
-install.packages("leaflet")
-install.packages("maps")
 library(readr)
 library(tidyverse)
 library(lubridate)
 library(ggplot2)
-library(viridis)
-library(maps)
-library(sf)
-#library(leaflet)
+library(scales)
+library(plotly)
+library(knitr)
 ```
 
--How dangerous are floods? 
--How expensive? 
--Is there any pattern to the kinds of communities that suffer losses from floods?
-
 ###<NOAA>###
-
 
 #load in the NOAA data and merge
 ```{r}
@@ -44,21 +35,18 @@ noaa_20_21 <- noaa_20_21 |>
            -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME,
            -BEGIN_RANGE,-BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE,
            -WFO)
+
 ```
 
 #change damage data into useable intergers
 ```{r}
 noaa_20_21$DAMAGE_PROPERTY <- str_replace_all(noaa_20_21$DAMAGE_PROPERTY, "[^0-9.]", "")
 noaa_20_21$DAMAGE_PROPERTY <- as.numeric(noaa_20_21$DAMAGE_PROPERTY)
-noaa_20_21$DAMAGE_PROPERTY <- round(noaa_20_21$DAMAGE_PROPERTY)
-options(scipen = 999)
 noaa_20_21$DAMAGE_PROPERTY <- noaa_20_21$DAMAGE_PROPERTY*100000
 
 
 noaa_20_21$DAMAGE_CROPS <- str_replace_all(noaa_20_21$DAMAGE_CROPS, "[^0-9.]", "")
 noaa_20_21$DAMAGE_CROPS <- as.numeric(noaa_20_21$DAMAGE_CROPS)
-noaa_20_21$DAMAGE_CROPS <- round(noaa_20_21$DAMAGE_CROPS)
-options(scipen = 999)
 noaa_20_21$DAMAGE_CROPS <- noaa_20_21$DAMAGE_CROPS*100000
 
 ```
@@ -71,60 +59,26 @@ noaa_20_21 <- noaa_20_21 %>%
 noaa_20_21 <- noaa_20_21 |>
   mutate(DAMAGE_TOTAL = DAMAGE_CROPS + DAMAGE_PROPERTY)|> #create total damage column
   relocate(DAMAGE_TOTAL, .before = SOURCE)
-
-options(scipen = 999) #out of sci. notation
 ```
 
--What states have what type of floods
+#create death and injury total columns
 ```{r}
-state_flood_type <- noaa_20_21 |>
-  group_by(STATE, EVENT_TYPE)|>
-  summarise(count = n())
+noaa_20_21 <- noaa_20_21 |>
+  mutate(DEATH_TOTAL = DEATHS_DIRECT + DEATHS_INDIRECT)|> 
+  relocate(DEATH_TOTAL, .before = DAMAGE_PROPERTY)
 
-#organize to get a better idea 
-easier_sft <- state_flood_type |>
-  pivot_wider(names_from = STATE, values_from = count)
+noaa_20_21 <- noaa_20_21 |>
+  mutate(INJURIES_TOTAL = INJURIES_DIRECT + INJURIES_INDIRECT)|> 
+  relocate(INJURIES_TOTAL, .before = DEATHS_DIRECT)
 
-
+noaa_20_21 <- noaa_20_21 |>
+  select(-DEATHS_DIRECT, -DEATHS_INDIRECT, -INJURIES_DIRECT, -INJURIES_INDIRECT)
 ```
 
--what types of floods are the most damaging 
 
--what months have what types of floods
+#NOAA QUESTIONS
 
--Causes of the types of floods
-
--what states have the most total damage
-
-
-#NOAA Questions
--what types of flood causes result in the most damage
-```{r}
-
-cause_dam <- noaa_20_21 |>
-  mutate(Year = as.numeric(substr(BEGIN_YEARMONTH, 1, 4)),  
-         Month = as.numeric(substr(BEGIN_YEARMONTH, 5, 6))) |> 
-  group_by(FLOOD_CAUSE, Year, Month) |> 
-  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))
-
-
-ggplot(cause_dam, aes(x = Month, y = DAMAGE_TOTAL, color = FLOOD_CAUSE)) +
-  geom_line(size = 1) +
-  scale_x_continuous(breaks = 1:12, labels = month.abb) +
-  scale_y_continuous(labels = scales::comma, breaks = seq(0, 600000000, by = 100000000)) +
-  labs(title = "Damage by Flood Cause",
-       subtitle = "for years 2020-2021",
-       x = "Month", 
-       y = "Total Damage", 
-       color = "Flood Cause") +
-  theme_minimal()
-
-
-
-```
-
-#
--what months have the most floods
+what months have the most floods
 ```{r}
 flood_month <- noaa_20_21 |>
   group_by(MONTH_NAME) |>
@@ -140,90 +94,264 @@ flood_month$MONTH_NAME <- factor(flood_month$MONTH_NAME, levels = custom_order)
 ggplot(flood_month, aes(x = MONTH_NAME, y = count, fill = MONTH_NAME)) +
   geom_bar(stat = "identity") +
   labs(x = "Month", y = "Count of Floods") +
-  ggtitle("Flood Count by Month") +
+  ggtitle("Months with most Floods") +
   labs(subtitle = "Years 2020-2021")+
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   
 ```
-#This graph shows that most floods for the years 2020-2021 occurred during the month of Februray
 
-
--states with the most flood damage ##trying visualize as a map but it will not work ugggghhh
+-What states have what type of floods
 ```{r}
-state_dam <- noaa_20_21 |>
-  group_by(STATE) |>
-  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL)) |>
-  arrange(desc(DAMAGE_TOTAL))
+state_flood_type <- noaa_20_21 |>
+  group_by(STATE, EVENT_TYPE)|>
+  summarise(count = n())
 
-#load a dataset that contains the geographical coordinates of the boundaries of U.S. states.
-states_map <- map_data("state")
-
-#change to lowercase for matching
-state_dam$STATE <- str_to_lower(state_dam$STATE)
-
-#merge original with spatial 
-dam_map <- left_join(states_map, state_dam, by = c("region" = "STATE"))|>
-  select(-subregion)
-
-dam_map <- dam_map |>
-  distinct(DAMAGE_TOTAL, .keep_all = TRUE)
-
-ggplot(dam_map, aes(x = long, y = lat, group = group, fill = DAMAGE_TOTAL)) +
-geom_polygon(colour = "black") +
-coord_map("polyconic")
+#organize to get a better idea 
+org_sft <- state_flood_type |>
+  pivot_wider(names_from = EVENT_TYPE, values_from = count)
+  
+ ggplot(state_flood_type, aes(x = STATE, y = count, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Flood Events by State", x = "State", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 
 
 
 ```
 
+-what types of floods are the most damaging 
+```{r}
+dam_flood <- noaa_20_21 |>
+  group_by(EVENT_TYPE)|>
+  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))
+
+ggplot(data = dam_flood, aes(x = EVENT_TYPE, y = DAMAGE_TOTAL, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Total Flood Damage by Event Type (2020-2021)",
+    x = "Event Type",
+    y = "Total Damage"
+  ) +
+  theme_minimal()
+
+
+#How do coastal floods have no damage
+```
+#I thought that flash floods would do more damage
+
+-deadliest floods
+```{r}
+dead_flood <- noaa_20_21|>
+  group_by(EVENT_TYPE)|>
+  summarise(DEATH_TOTAL = sum(DEATH_TOTAL))
+
+ggplot(dead_flood, aes(x = EVENT_TYPE, y = DEATH_TOTAL, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Deaths by Flood Event Type", x = "Event Type", y = "Total Deaths") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  
+```
+
+-Causes of the types of floods
+```{r}
+flood_cause <- noaa_20_21 |>
+  group_by(EVENT_TYPE, FLOOD_CAUSE) |>
+  summarise(count = n())
+ 
+ ggplot(data = flood_cause, aes(x = EVENT_TYPE, y = FLOOD_CAUSE, fill = log(count + 1))) + #log for visual effect
+   geom_tile() +
+   scale_fill_gradient(low = "pink", high = "red") +
+   labs(
+     title = "Cause of Event Type",
+     x = "Event Type",
+     y = "Flood Cause",
+     fill = "Count"
+   ) +
+   theme_minimal() +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+
+#what states have the most total damage
+```{r}
+state_dam <- noaa_20_21 |>
+  group_by(STATE)|>
+  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))|>
+  arrange(desc(DAMAGE_TOTAL))|>
+  head(10)
+
+ggplot(data = state_dam, aes(x = reorder(STATE, -DAMAGE_TOTAL), y = DAMAGE_TOTAL, fill = STATE)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Top 10 States with the Most Damage (2020-2021)",
+    x = "State",
+    y = "Total Damage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+-what types of floods does new york experience 
+```{r}
+ny_ftype <- noaa_20_21 |>
+  group_by(EVENT_TYPE, STATE)|>
+  filter(STATE == "NEW YORK")|>
+  summarise(count = n())
+
+ggplot(data = ny_ftype, aes(x = EVENT_TYPE, y = count, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Flood Event Types in New York (2020-2021)",
+    x = "Event Type",
+    y = "Count"
+  ) +
+  theme_minimal() 
+```
+
+-how many deaths from floods in new york
+```{r}
+ny_death <- noaa_20_21 |> 
+  filter(STATE == "NEW YORK") |>
+  summarise(DEATH_TOTAL = sum(DEATH_TOTAL))
+#Answer = 1
+#no need for visual. Just curious
+  #has the most damage but only has one death. what state has the most deaths
+```
+
+-deaths from floods by state
+```{r}
+top_death_state <- noaa_20_21|>
+  group_by(STATE)|>
+  summarise(DEATH_TOTAL = sum(DEATH_TOTAL))|>
+  arrange(desc(DEATH_TOTAL))|>
+  head(10)
+#what events caused so many deaths in the year 2020-2021 in Tennesee 
+
+ggplot(top_death_state, aes(x = STATE, y = DEATH_TOTAL, fill = STATE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Deaths by State", x = "State", y = "Total Deaths") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for better readability
+```
+
+```{r}
+#how many floods did Tennesse have
+tenn_flood_n <- noaa_20_21 |>
+  filter(STATE == "TENNESSEE")|>
+  count(EVENT_TYPE)
+
+ggplot(tenn_flood_n, aes(x = EVENT_TYPE, y = n, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Flood Event Types in Tennessee", x = "Event Type", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for better readability
+
+#total = 82
+
+```
+
+```{r}
+#how much damage was done
+dam_tenn <- noaa_20_21 |>
+  filter(STATE == "TENNESSEE") |>
+  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))
+#Answer = $521,911,000
+
+#no need to graph. just curious
+  
+
+#####INVESTIGATE
+
+```
+
+#damage vs death
+```{r}
+
+interact <- ggplot(noaa_20_21, aes(x = DAMAGE_TOTAL, y = DEATH_TOTAL, text = STATE, fill = STATE)) +
+  geom_point() +
+  labs(title = "Flood Damage vs. Death Total",
+       x = "Flood Damage",
+       y = "Death Total"
+       ) +
+  theme_minimal()
+
+ggplotly(interact)
+
+#There is no correlation between amount of damage and deaths
+```
+
+#sometime between 2020-2021 there was a flood that caused 19 total deaths and $10,000,000 worth of damage AUGUST 21/ 2021 HUMPHREYS COUNTY
+
+extra questions
+-what qualifies as damage
+
+-what causes a lakeshore flood
+
+-what causes a coastal flood
+
+-why does washington and new hamphire have no flood damage
+
 
 -what states have what types of flood causes
+
+Future work
+- graph on a US map to get a better idea
+- demographics of regions and how that plays a role on relief given
+- flood insurance need vs. have
+- how does was Wisconsin affected by a tropical system?
 ```{r}
 
 state_trop <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Heavy Rain / Tropical System") |>
-  group_by(STATE)
-#Florida
+  group_by(STATE)|>
+  select(STATE, YEAR, MONTH_NAME, FLOOD_CAUSE)|>
+  distinct(STATE, .keep_all = TRUE)
+#would assume states along the southern and eastern coast. How did Wisconsin get in here?
+
+
+kable(state_trop, align = "c", caption = "TROPICAL SYSTEM STATES") #create table
 
 state_ice <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Ice Jam")|>
   group_by(STATE)
+#makes sense. Northern colder states
 
 state_burn <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Heavy Rain / Burn Area")|>
   group_by(STATE)
+#makes sense. Hot South Western states
 
 state_melt <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Heavy Rain / Snow Melt")|>
   group_by(STATE)
+#makes sense. Colder Northern states
 
 state_levee <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Dam / Levee Break")|>
   group_by(STATE)
+#makes sense. Any state with a Dam / Levee
 
 state_release <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Planned Dam Release")|>
   group_by(STATE)
+#makes sense. Any state with a Dam
 
 state_just_rain <- noaa_20_21 |>
   filter(FLOOD_CAUSE == "Heavy Rain")|>
   group_by(STATE)
+#makes sense
+
+
+#I want to visualize this make a table?
 ```
-
-
-
-- how long does a flood usually last
-
-
-
-
-
-
-
-
 
 ###<FEMA>###
 
@@ -237,7 +365,7 @@ fema_data <- left_join(Mydata_3, Mydata_4, "disasterNumber")
 
 #filter to keep only columns of interest
 ```{r}
-fema_data$incidentBeginDate <- year(fema_data$incidentBeginDate)
+
 fema_data_int <- fema_data |> 
   filter(incidentType == "Flood") |>
   filter(incidentBeginDate == "2020" | incidentBeginDate ==  "2021")|>
@@ -245,23 +373,14 @@ fema_data_int <- fema_data |>
          -tribalRequest, -lastRefresh.y, -id.y, -hash.y, -iaLoadDate, -lastIAFilingDate, -ihProgramDeclared, -iaProgramDeclared, -paProgramDeclared, -hmProgramDeclared)|>
   relocate(designatedArea, .before = declarationDate)
 
-#take care of NA's
-fema_data_int$totalNumberIaApporved[is.na(fema_data_int$totalNumberIaApproved)] <- 0
-fema_data_int$totalAmountIhpApproved[is.na(fema_data_int$totalAmountIhpApproved)] <- 0
-fema_data_int$totalAmountHaApproved[is.na(fema_data_int$totalAmountHaApproved)] <- 0
-fema_data_int$totalAmountOnaAproved[is.na(fema_data_int$totalAmountOnaAproved)] <- 0
 
-#need to figure out what these mean and what is the actually amount sent as relief to help people in these areas
 ```
 
-#FEMA Questions
--what counties receive the most relief
--further what are the demographics in this area 
--how long did it take for this area to receive support
+```{r}
+#how much relief was given to one the deadliest floods
+tenn_relief <- fema_data_int |>
+  filter(state == "TN")
 
-#Need to know 
--totalnumberIaapproved
--totalamountihpapproved
--totalamounthaapproved
--totalamountOnaapproved
--so many different variables what the hell is the one that tells me the information i want to know
+```
+
+
