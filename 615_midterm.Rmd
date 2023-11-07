@@ -239,7 +239,7 @@ ggplot(top_death_state, aes(x = STATE, y = DEATH_TOTAL, fill = STATE)) +
   geom_bar(stat = "identity") +
   labs(title = "Total Deaths by State", x = "State", y = "Total Deaths") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for better readability
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  
 ```
 
 ```{r}

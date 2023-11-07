@@ -5,23 +5,260 @@ format: html
 editor: visual
 ---
 
-## Quarto
+![Tennessee flash floods kill at least 22, dozens remain missing.](https://compote.slate.com/images/6891862f-98f9-4a1e-b36e-7e07d69bb3ee.png?width=780&height=520&rect=1224x816&offset=61x0){alt="Tennessee flash floods kill at least 22, dozens remain missing."}
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
+```{r, echo=FALSE}
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(scales)
+library(plotly)
+library(knitr)
 ```
 
-You can add options to executable code like this
-
-```{r}
-#| echo: false
-2 * 2
+```{r, echo=FALSE}
+Mydata <- read_csv("StormEvents_details-ftp_v1.0_d2020_c20230927.csv.gz")
+Mydata_2 <- read_csv("StormEvents_details-ftp_v1.0_d2021_c20231017.csv.gz")
+noaa_20_21 <- rbind(Mydata, Mydata_2)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r, echo=FALSE}
+noaa_20_21 <- noaa_20_21 |>
+  filter(grepl("Flood", EVENT_TYPE, ignore.case = TRUE))|>
+  select(-MAGNITUDE, -MAGNITUDE_TYPE, -CATEGORY, -TOR_F_SCALE, -TOR_LENGTH, -TOR_WIDTH, 
+           -TOR_OTHER_WFO, -TOR_OTHER_CZ_STATE, -TOR_OTHER_CZ_FIPS, -TOR_OTHER_CZ_NAME,
+           -BEGIN_RANGE,-BEGIN_AZIMUTH, -END_RANGE, -END_AZIMUTH, -CZ_TIMEZONE, -DATA_SOURCE,
+           -WFO)
+```
+
+```{r, echo=FALSE}
+noaa_20_21$DAMAGE_PROPERTY <- str_replace_all(noaa_20_21$DAMAGE_PROPERTY, "[^0-9.]", "")
+noaa_20_21$DAMAGE_PROPERTY <- as.numeric(noaa_20_21$DAMAGE_PROPERTY)
+noaa_20_21$DAMAGE_PROPERTY <- noaa_20_21$DAMAGE_PROPERTY*100000
+
+
+noaa_20_21$DAMAGE_CROPS <- str_replace_all(noaa_20_21$DAMAGE_CROPS, "[^0-9.]", "")
+noaa_20_21$DAMAGE_CROPS <- as.numeric(noaa_20_21$DAMAGE_CROPS)
+noaa_20_21$DAMAGE_CROPS <- noaa_20_21$DAMAGE_CROPS*100000
+
+```
+
+```{r, echo=FALSE}
+noaa_20_21 <- noaa_20_21 %>%
+  filter(DAMAGE_PROPERTY != 0 | DAMAGE_CROPS != 0)
+
+noaa_20_21 <- noaa_20_21 |>
+  mutate(DAMAGE_TOTAL = DAMAGE_CROPS + DAMAGE_PROPERTY)|> #create total damage column
+  relocate(DAMAGE_TOTAL, .before = SOURCE)
+```
+
+```{r, echo=FALSE}
+noaa_20_21 <- noaa_20_21 |>
+  mutate(DEATH_TOTAL = DEATHS_DIRECT + DEATHS_INDIRECT)|> 
+  relocate(DEATH_TOTAL, .before = DAMAGE_PROPERTY)
+
+noaa_20_21 <- noaa_20_21 |>
+  mutate(INJURIES_TOTAL = INJURIES_DIRECT + INJURIES_INDIRECT)|> 
+  relocate(INJURIES_TOTAL, .before = DEATHS_DIRECT)
+
+noaa_20_21 <- noaa_20_21 |>
+  select(-DEATHS_DIRECT, -DEATHS_INDIRECT, -INJURIES_DIRECT, -INJURIES_INDIRECT)
+```
+
+## Introduction
+
+Unlike many other natural disasters, floods are not region specific. Any state in the country can be impacted by these catastrophic events that leave behind millions, if not billions, of dollars in damage. Through the following exploratory data analysis (EDA), we examine the devastation caused by floods state by state, various causes of floods, and dive deeper in to specific flood events for the years 2020 and 2021.
+
+## Data Acquisition and Cleaning
+
+The data sets of interest for this EDA were pulled from the National Oceanic and Atmospheric Administration (NOAA). NOAA Is a regulatory agency within the United States Department of Commerce. NOAA monitors, researches, and manages various aspects of the Earth's environment, including the oceans and atmosphere. The data includes information on natural disaster event type, the year and month the event began, deaths and damages caused be the event, as well as other variables not of interest for this particular analysis.
+
+To begin, the NOAA 2020 and NOAA 2021 "Storm Event details" data sets were combined for easier analysis. For quicker navigation irrelevant variables and observations were removed from the new data set. Observations were deemed irrelevant if they contained information about events outside the scoop of this analysis (i.e. Winter Storm, Hail, Strong Wind). After filtering for events that were not floods, the data set include the values flash flood, flood, lake shore flood, and coastal flood. Deeming of Variables followed the same process (i.e. TOR_F_SCALE contained information about tornado scales). Damage_Property and Damage_Crop columns were converted to integers so that summing the values and creating a new column named Damage_Total was possible. Indirect_Deaths and Direct_Deaths as well as Indirect_Injuries and Direct_Injuries were combined in to Death_Total and Injuries_Total respectively. The data set was filtered by damage totals that were not equal to zero. After cleaning the data exploration was possible.
+
+## EDA/motivations
+
+The initial graphs produced by the EDA do not have an intentional direction. They were produced after looking at the data set and writing questions such as:
+
+-What months have the most floods
+
+-What states have what types of floods (flash floods, floods, lake shore floods, and coastal floods
+
+-What types of floods are the most damaging
+
+```{r, echo=FALSE}
+flood_month <- noaa_20_21 |>
+  group_by(MONTH_NAME) |>
+  summarise(count = n()) |>
+  arrange(desc(count))
+
+custom_order <- c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+
+
+flood_month$MONTH_NAME <- factor(flood_month$MONTH_NAME, levels = custom_order)
+
+
+ggplot(flood_month, aes(x = MONTH_NAME, y = count, fill = MONTH_NAME)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Month", y = "Count of Floods") +
+  ggtitle("Months with most Floods") +
+  labs(subtitle = "Years 2020-2021")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+This graph reveals that most floods for the years 2020 and 2021 occurred during the month of July
+
+```{r, echo=FALSE}
+dam_flood <- noaa_20_21 |>
+  group_by(EVENT_TYPE)|>
+  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))
+
+ggplot(data = dam_flood, aes(x = EVENT_TYPE, y = DAMAGE_TOTAL, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Total Flood Damage by Event Type (2020-2021)",
+    x = "Event Type",
+    y = "Total Damage"
+  ) +
+  theme_minimal()
+```
+
+As expected, flash floods cause the most damage. This may in part be due to their sudden onset with limited warning. Flash floods often produce a high volume of water moving at a rapid pace.
+
+```{r, echo=FALSE}
+dead_flood <- noaa_20_21|>
+  group_by(EVENT_TYPE)|>
+  summarise(DEATH_TOTAL = sum(DEATH_TOTAL))
+
+ggplot(dead_flood, aes(x = EVENT_TYPE, y = DEATH_TOTAL, fill = EVENT_TYPE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Deaths by Flood Event Type", x = "Event Type", y = "Total Deaths") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  
+```
+
+It also makes sense that flash floods be the deadliest of the flood types for the same reason that it accounts for the most total damage.
+
+After assessing what types of floods were the most damaging and deadliest the analysis began to progress in a more specific direction. What states were the most affected by these floods was investigated next.
+
+```{r, echo=FALSE}
+state_dam <- noaa_20_21 |>
+  group_by(STATE)|>
+  summarise(DAMAGE_TOTAL = sum(DAMAGE_TOTAL))|>
+  arrange(desc(DAMAGE_TOTAL))|>
+  head(10)
+
+ggplot(data = state_dam, aes(x = reorder(STATE, -DAMAGE_TOTAL), y = DAMAGE_TOTAL, fill = STATE)) +
+  geom_bar(stat = "identity") +
+  labs(
+    title = "Top 10 States with the Most Damage (2020-2021)",
+    x = "State",
+    y = "Total Damage"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+This figure displays that the city of New York has the highest number of total damage by floods. Does it also have the highest number of deaths?
+
+```{r, echo=FALSE}
+top_death_state <- noaa_20_21|>
+  group_by(STATE)|>
+  summarise(DEATH_TOTAL = sum(DEATH_TOTAL))|>
+  arrange(desc(DEATH_TOTAL))|>
+  head(10)
+#what events caused so many deaths in the year 2020-2021 in Tennesee 
+
+ggplot(top_death_state, aes(x = STATE, y = DEATH_TOTAL, fill = STATE)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Deaths by State", x = "State", y = "Total Deaths") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The answer is no. Upon further examination it was discovered that the deadliest flood between the years 2020 to 2021 occurred in Tennessee. This flood, beginning August 21st, 2021 in Dickson, Hickson, Houston, and Humpheys counties, resulted in 19 deaths and \$10,000,000 in total damage.
+
+Because the New York city had the highest amount of total damage but not the highest amount of total deaths, a new questions was formed. Is there a relationship between the amount of damage a flood produces and the deaths that follow as a result?
+
+```{r, echo=FALSE}
+interact <- ggplot(noaa_20_21, aes(x = DAMAGE_TOTAL, y = DEATH_TOTAL, text = STATE, fill = STATE)) +
+  geom_point() +
+  labs(title = "Flood Damage vs. Death Total",
+       x = "Flood Damage",
+       y = "Death Total"
+       ) +
+  theme_minimal()
+
+ggplotly(interact)
+
+```
+
+According to the above interactive scatterplot, the answer is no.
+
+After the Tennessee rabbit hole met its end, the next question to be answer was, "what event types are produced by what flood causes?"
+
+```{r, echo=FALSE}
+flood_cause <- noaa_20_21 |>
+  group_by(EVENT_TYPE, FLOOD_CAUSE) |>
+  summarise(count = n())
+ 
+ ggplot(data = flood_cause, aes(x = EVENT_TYPE, y = FLOOD_CAUSE, fill = log(count + 1))) + #log for visual effect
+   geom_tile() +
+   scale_fill_gradient(low = "pink", high = "red") +
+   labs(
+     title = "Cause of Event Type",
+     x = "Event Type",
+     y = "Flood Cause",
+     fill = "Count"
+   ) +
+   theme_minimal() +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+What are the causes of lake shore and coastal floods? These were questions produced after investigation of this figure.
+
+Lastly, what states typically have floods produced by what flood cause? The flood cause included:
+
+-Heavy Rain
+
+-Dam / Levee Break
+
+-Heavy Rain / Tropical System
+
+-Heavy Rain / Snow Melt
+
+-Heavy Rain / Burn Area
+
+-Ice Jam
+
+-Planned Dam Release
+
+Most of the results made sense for the geographic location. Ice jams typically occurred in northern colder states. Heavy Rain/ Burn Area occurred in hotter south western states. One result to was somewhat peculiar is shown in the following table.
+
+```{r, echo=FALSE}
+state_trop <- noaa_20_21 |>
+  filter(FLOOD_CAUSE == "Heavy Rain / Tropical System") |>
+  group_by(STATE)|>
+  select(STATE, YEAR, MONTH_NAME, FLOOD_CAUSE)|>
+  distinct(STATE, .keep_all = TRUE)
+
+
+kable(state_trop, align = "c", caption = "TROPICAL SYSTEM STATES") #create table
+```
+
+One would assume that states along the southern and eastern coast would be the ones affected by floods caused by tropical systems. So how did Wisconsin, a state in the Midwest get affected?
+
+## Conclusion/ Future work
+
+The data sets from the National Oceanic and Atmospheric Administration (NOAA) are quite informative and can be used to help make a number of decisions as well as produce questions for further investigation. In the future it would be interesting to see the amount of flood damage its relationship to the amount of flood insurance policies in that state. Additionally, it would be interesting to investigate the demographics of the areas affected by these floods.
+
+## Glossary
+
+Flood - develop gradually over an extended period, often as a result of sustained heavy rainfall, snowmelt, or rising water levels in rivers. They typically have a relatively slow onset, and people may have some advance warning.
+
+Flash Flood - sudden and often unexpected flood that occurs within a short period, typically less than six hours. Flash floods can develop very rapidly, often in a matter of minutes, and they are known for their swift and violent onset.
+
+## 
